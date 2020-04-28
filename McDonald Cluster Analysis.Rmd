@@ -1,0 +1,184 @@
+```{r}
+
+```
+
+
+```{r}
+library(cluster) 
+library(fpc)
+library(cluster)
+library(factoextra)
+library(mclust)
+library(fastDummies)
+library(caret)
+library(dummies)
+library(dplyr)
+library(NbClust)
+library(tidyr)
+library(descr)
+
+
+```
+
+```{r}
+crosstab(pref_en, city_en, row.vars = c("pref_en", "city_en"), col.vars = "Day", type = "f")
+
+```
+
+
+```{r}
+#Split df
+df$Store_Name = NULL
+df$Site_ID = NULL
+df$Max_GC = NULL
+df$Min_GC = NULL
+df$pref_en = NULL
+df$city_en = NULL
+df$Min_Sales = NULL
+df$Max_Sales = NULL
+
+df1 <-subset(df, df$Day==1)
+df2 <-subset(df, df$Day==2)
+df3 <-subset(df, df$Day==3)
+```
+
+
+```{r}
+#Removing unecessary parts
+na.omit(gc_sales)
+
+na.omit(df_s_1)
+drop_na(df1)
+na.omit(df2)
+na.omit(df3)
+
+#Scaling your own data. 
+df_s_1 <- scale(df1, scale = T)
+df_s_2 <- scale(df2, scale = T)
+df_s_3 <- scale(df3, scale = T)
+```
+
+```{r}
+df1[!complete.cases(df1),]
+
+row.has.na <- apply(df1, 1, function(x){any(is.na(x))})
+sum(row.has.na)
+df1.filtered <- df1[!row.has.na,]
+```
+
+```{r}
+##K-means clustering
+
+# If you determine the number of clusters
+# K-Means Cluster Analysis
+fit <- kmeans(df1, 4) # 4 cluster solution
+fit2 <- kmeans(df2, 4) # 4 cluster solution
+fit3 <- kmeans(df3, 4) # 4 cluster solution
+# get cluster means 
+aggregate(df1,by=list(fit$cluster),FUN=mean)
+aggregate(df2,by=list(fit2$cluster),FUN=mean)
+aggregate(df3,by=list(fit3$cluster),FUN=mean)
+# append cluster assignment
+df_clust_1 <- data.frame(df1, fit$cluster)
+```
+
+
+```{r}
+##Using Ward's Hierarchical clustering
+# Ward Hierarchical Clustering
+d_ward1 <- dist(df1, method = "euclidean") # distance matrix
+fit <- hclust(d_ward1, method="ward.D") 
+plot(fit) # display dendogram
+groups <- cutree(fit, k=4) # cut tree into 5 clusters
+# draw dendogram with red borders around the 5 clusters 
+rect.hclust(fit, k=4, border="red")
+```
+
+
+```{r}
+# Determine number of clusters 
+#Day1
+wss <- (nrow(df1)-1)*sum(apply(df1,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(df1, 
+                                     centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+#Using elbow method
+fviz_nbclust(df1, kmeans, method = "wss") +
+  geom_vline(xintercept = 4, linetype = 2)+
+  labs(subtitle = "Elbow method")
+
+#Day2
+wss <- (nrow(df2)-1)*sum(apply(df2,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(df2, 
+                                     centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+#Using elbow method
+fviz_nbclust(df2, kmeans, method = "wss") +
+  geom_vline(xintercept = 4, linetype = 2)+
+  labs(subtitle = "Elbow method")
+
+
+#Day3
+wss <- (nrow(df3)-1)*sum(apply(df3,2,var))
+for (i in 2:15) wss[i] <- sum(kmeans(df3, 
+                                     centers=i)$withinss)
+plot(1:15, wss, type="b", xlab="Number of Clusters",
+     ylab="Within groups sum of squares")
+
+#Using elbow method
+fviz_nbclust(df3, kmeans, method = "wss") +
+  geom_vline(xintercept = 4, linetype = 2)+
+  labs(subtitle = "Elbow method")
+```
+
+
+```{r}
+# Using BIC
+
+d_clust1 <- Mclust(as.matrix(df1), G=1:15, 
+                  modelNames = mclust.options("emModelNames"))
+d_clust1$BIC
+plot(d_clust1)
+
+##Using different indices to determine
+
+nb1 <- NbClust(df1, distance = "euclidean", min.nc = 2,
+              max.nc = 10, method = "complete", index ="all")
+
+# K-Means Clustering with 4 clusters
+fit <- kmeans(df_s_1, 4)
+
+# Cluster Plot against 1st 2 principal components
+
+# vary parameters for most readable graph
+
+clusplot(df1, fit$cluster, color=TRUE, shade=TRUE, 
+         labels=2, lines=0)
+
+##Or use this
+
+km.res <- eclust(df_s_1, "kmeans", k = 3,
+                 nstart = 25, graph = FALSE)
+fviz_cluster(km.res, geom = "point", frame.type = "norm")
+
+
+# Centroid Plot against 1st 2 discriminant functions
+
+plotcluster(df_s_1, fit$cluster)
+
+# comparing 2 cluster solutions
+fit <- kmeans(df_s_1, 4)
+fit2 <- kmeans(df_s_1,3)
+df2 <- data.frame(df1, fit$cluster, fit2$cluster)
+cluster.stats(d, fit$cluster, fit2$cluster)
+
+#Nested cluster
+
+nested <- agnes(df_s,  metric = "manhattan",stand = TRUE)
+
+summary(nested)
+```
